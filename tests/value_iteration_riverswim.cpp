@@ -2,13 +2,10 @@
 #include "../src/mdp.cpp"
 #define LEFT 0
 #define RIGHT 1
-#define N 4
+#define N 10
+#define SIM_STEPS 3e6
 
 int main() {
-    /*
-        Expected: always go to the right in the default version, even if it isn't immediately profitable (works)
-        Variant: boost reward of going left from state 0 way up - we'd expect that going left from anywhere is now the optimal policy (doesn't work: on state N-1, we prefer going to the right still)
-    */
     vector<int> actions[N];
     for (int i=0; i<N; i++) actions[i] = {LEFT, RIGHT};
 
@@ -65,13 +62,15 @@ int main() {
     MDP mdp(N, actions, transitions, rewards);
     Policy policy = value_iteration(&mdp, N, 1e9, 1e-6);
     print_policy(&policy);
+    cout << endl;
 
     // Apply policy and estimate stationary distribution
 
     Agent agent(&mdp, &policy);
-    vector<float> d = stationary_distribution(&agent, 1e6);
+    vector<float> d = stationary_distribution(&agent, SIM_STEPS);
+    cout << "Stationary distribution after " << SIM_STEPS << " steps is estimated to be:" << endl;
     for (float f: d) {
-        cout << f << " ";
+        cout << setw(10) << f << " ";
     }
 
     return 0;
