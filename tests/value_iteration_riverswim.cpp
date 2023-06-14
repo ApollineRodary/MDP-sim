@@ -73,5 +73,7 @@ int main() {
         cout << setw(10) << f << " ";
     }
 
+    // TODO: Run value iteration on policy to get stationary distribution; compare with previous result
+
     return 0;
 }

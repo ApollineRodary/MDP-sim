@@ -133,7 +133,12 @@ class Agent {
         }
 };
 
-Policy value_iteration(MDP *mdp, int n, int max_steps, float eps) {
+Policy value_iteration(MDP *mdp, int n, int max_steps, float eps, vector<float> *d) {
+    /* 
+        Runs value iteration on an MDP with n states until the span of the difference gets lower than eps
+        Returns corresponding policy and sends corresponding stationary distribution to d
+    */
+
     if (eps<=0) throw invalid_argument("eps must be a positive value");
 
     float v[n];
@@ -172,13 +177,22 @@ Policy value_iteration(MDP *mdp, int n, int max_steps, float eps) {
 
         if (max_dv - min_dv < eps) {
             vector<int> pol;
-            for (int x=0; x<n; x++) pol.push_back(best_action[x]);
+            for (int x=0; x<n; x++) {
+                pol.push_back(best_action[x]);
+                d->push_back(v[x]);
+            }
             Policy policy = {{pol}};
             return policy;
         }
     }
     Policy policy = {{}};
     return policy;
+}
+
+
+Policy value_iteration(MDP *mdp, int n, int max_steps, float eps) {
+    vector<float> d;
+    return (value_iteration(mdp, n, max_steps, eps, &d));
 }
 
 void print_policy(Policy *policy) {
