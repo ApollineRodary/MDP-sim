@@ -133,10 +133,10 @@ class Agent {
         }
 };
 
-Policy value_iteration(MDP *mdp, int n, int max_steps, float eps, vector<float> *d) {
+Policy value_iteration(MDP *mdp, int n, int max_steps, float eps, float *g) {
     /* 
         Runs value iteration on an MDP with n states until the span of the difference gets lower than eps
-        Returns corresponding policy and sends corresponding stationary distribution to d
+        Returns corresponding policy and sends corresponding gain to g
     */
 
     if (eps<=0) throw invalid_argument("eps must be a positive value");
@@ -174,13 +174,13 @@ Policy value_iteration(MDP *mdp, int n, int max_steps, float eps, vector<float> 
             if (dv < min_dv) min_dv = dv;
             v[x] = w[x];
         }
+        float v0 = v[0];
+        for (int x=0; x<n; x++) v[x] -= v0;
 
         if (max_dv - min_dv < eps) {
             vector<int> pol;
-            for (int x=0; x<n; x++) {
-                pol.push_back(best_action[x]);
-                d->push_back(v[x]);
-            }
+            *g = (max_dv + min_dv)/2;
+            for (int x=0; x<n; x++) pol.push_back(best_action[x]);
             Policy policy = {{pol}};
             return policy;
         }
@@ -189,10 +189,9 @@ Policy value_iteration(MDP *mdp, int n, int max_steps, float eps, vector<float> 
     return policy;
 }
 
-
 Policy value_iteration(MDP *mdp, int n, int max_steps, float eps) {
-    vector<float> d;
-    return (value_iteration(mdp, n, max_steps, eps, &d));
+    float g;
+    return (value_iteration(mdp, n, max_steps, eps, &g));
 }
 
 void print_policy(Policy *policy) {
@@ -220,4 +219,34 @@ vector<float> stationary_distribution(Agent *agent, int steps) {
     vector<float> d;
     for (int f: frequency) d.push_back(((float) f)/steps);   
     return d;
+}
+
+vector<float> invariant_measure(MDP *mdp, Policy *policy) {
+    /* Get invariant measure of a policy with value iteration */
+    
+    vector<float> ans;
+
+    int n = mdp->states;
+    for (int x=0; x<n; x++) {
+        vector<int> actions[n];
+        int max_action = 0;
+        for (int i=0; i<n; i++) {
+            int action = (*policy)(i, 0);
+            actions[i] = {action};
+            if (action > max_action) max_action = action;
+        }
+
+        float **rewards = new float*[n];
+        for (int i=0; i<n; i++) {
+            rewards[i] = new float[max_action];
+            for (int a=0; a<max_action; a++) rewards[i][a] = 0.0;
+        }
+        rewards[x][(*policy)(x, 0)] = 1.0;
+
+        MDP nmdp = MDP(n, actions, mdp->transitions, rewards);
+        float g;
+        value_iteration(&nmdp, n, 1e6, 1e-6, &g);
+        ans.push_back(g);
+    }
+    return ans;
 }

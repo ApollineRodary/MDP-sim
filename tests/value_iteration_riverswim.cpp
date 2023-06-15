@@ -3,7 +3,7 @@
 #define LEFT 0
 #define RIGHT 1
 #define N 10
-#define SIM_STEPS 3e6
+#define SIM_STEPS 1e6
 
 int main() {
     vector<int> actions[N];
@@ -23,7 +23,7 @@ int main() {
             transitions[x][RIGHT][x] = 0.6;
             transitions[x][RIGHT][x-1] = 0.05;
             transitions[x][LEFT][x-1] = 1.0;
-        }        
+        }
     }
     transitions[0][RIGHT][0] = 0.6;
     transitions[0][RIGHT][1] = 0.4;
@@ -64,16 +64,20 @@ int main() {
     print_policy(&policy);
     cout << endl;
 
-    // Apply policy and estimate stationary distribution
+    // Apply policy and estimate invariant measure
 
     Agent agent(&mdp, &policy);
     vector<float> d = stationary_distribution(&agent, SIM_STEPS);
-    cout << "Stationary distribution after " << SIM_STEPS << " steps is estimated to be:" << endl;
-    for (float f: d) {
-        cout << setw(10) << f << " ";
-    }
+    cout << "Invariant measure after " << SIM_STEPS << " steps is estimated to be:" << endl;
+    for (float f: d) cout << setw(10) << f << " ";
+    cout << endl << endl;
 
-    // TODO: Run value iteration on policy to get stationary distribution; compare with previous result
+    // Get invariant measure from value iteration
+
+    vector<float> im = invariant_measure(&mdp, &policy);
+    cout << "Invariant measure with value iteration is estimated to be:" << endl;
+    for (float f: im) cout << setw(10) << f << " ";
+    cout << endl << endl;
 
     return 0;
 }
