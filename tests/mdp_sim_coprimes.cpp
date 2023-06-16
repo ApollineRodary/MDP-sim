@@ -6,7 +6,7 @@ using namespace std;
 int main() {
     // A weird example: 10 states, actions are numbers coprime with the current state, and picking an action is adding the action number to that state with probability 0.91.
     int states = 10;
-    vector<int> actions[10];
+    vector<int> *actions = new vector<int>[10];
     for (int i=0; i<10; i++) {
         actions[i] = {};
         for (int j=0; j<10; j++) {
@@ -26,25 +26,35 @@ int main() {
     for (int x=0; x<10; x++) {
         rewards[x] = new float[10];
         for (int a=0; a<10; a++) {
-            rewards[x][a] = (float)((x+a)%10) / 10;
+            rewards[x][a] = (float)((x+a+2)%10) / 10;
         }
     }
 
     MDP mdp(states, actions, transitions, rewards);
     Agent agent(&mdp);
+    vector<int> available = mdp.getAvailableActions();
+    for (int a: available) cout << a << " ";
+    cout << endl;
 
-    int steps = 10;
+    int steps = 30;
     for (int i=1; i<=steps; i++) {
+        // Show current step
         cout << "Step (" << i << "/" << steps << ")" << endl;
+        
+        // Show current state and available actions
         int stateBefore = mdp.getState();
         cout << "  Current state: " << stateBefore + 1 << endl;
         cout << "  Available actions:";
         for (int a: mdp.getAvailableActions()) cout << " " << a+1;
-        float rewardBefore = mdp.getTotalRewards();
-        int action = agent.makeRandomAction();
+
+        // Run random action and save reward
+        float reward;
+        int action = agent.makeRandomAction(&reward);
+        
+        // Show the action that was chosen and the reward we got
         cout << endl << "  Choosing action " << action + 1 << endl;
-        float rewardAfter = mdp.getTotalRewards();
-        cout << "  Action was rewarded with " << rewardAfter - rewardBefore << endl;
+        cout << "  Action was rewarded with " << reward << endl;
+
         cout << "=============================================" << endl;
     }
 }

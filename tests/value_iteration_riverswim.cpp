@@ -1,5 +1,5 @@
 #include <iomanip>
-#include "../src/mdp.cpp"
+#include "../src/value_iteration.cpp"
 #define LEFT 0
 #define RIGHT 1
 #define N 10
@@ -59,7 +59,7 @@ int main() {
 
     // Find and display optimal policy with value iteration algorithm
 
-    MDP mdp(N, actions, transitions, rewards);
+    OfflineMDP mdp(N, actions, transitions, rewards);
     Policy policy = value_iteration(&mdp, N, 1e9, 1e-6);
     print_policy(&policy);
     cout << endl;
