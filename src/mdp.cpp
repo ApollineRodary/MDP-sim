@@ -112,11 +112,7 @@ class OfflineMDP: public MDP {
             this->rewards = rewards;
         }
 
-        OfflineMDP(int states, vector<int> *actions, float ***transitions, float **rewards) : MDP(states, actions, transitions, rewards) {
-            this->actions = actions;
-            this->transitions = transitions;
-            this->rewards = rewards;
-        }
+        OfflineMDP(int states, vector<int> *actions, float ***transitions, float **rewards) : OfflineMDP(states, actions, transitions, rewards, 1.0f) {}
 
         vector<int> *getActions() {
             return actions;
