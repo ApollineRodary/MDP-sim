@@ -18,7 +18,7 @@ Policy value_iteration(OfflineMDP *mdp, int n, int max_steps, float eps, float *
         // Compute w out of v (Bellman equation)
         for (int x=0; x<n; x++) {
             vector<int> actions = mdp->getAvailableActions(x);
-            float max_q = 0;
+            float max_q = -INFINITY;
             for (int a: actions) {
                 // q = Q_{t+1}*(x, a)
                 float q = mdp->getRewards(x, a);
@@ -67,19 +67,28 @@ vector<float> invariant_measure(OfflineMDP *mdp, Policy *policy) {
     vector<float> ans;
 
     int n = mdp->getStates();
-    for (int x=0; x<n; x++) {
-        vector<int> actions[n];
-        int max_action = 0;
-        for (int i=0; i<n; i++) {
-            int action = (*policy)(i, 0);
-            actions[i] = {action};
-            if (action > max_action) max_action = action;
-        }
 
+    // Get ID of maximum action used by policy (needed to create new MDP)
+    int max_action_id = 0;
+    for (int x=0; x<n; x++) {
+        int action = (*policy)(x, 0);
+        if (action > max_action_id)
+            max_action_id = action;
+    }
+
+    for (int x=0; x<n; x++) {
+        // Run value iteration on modified MDP for every state
+        vector<int> actions[n];
+        for (int i=0; i<n; i++) 
+            // Only legal action from state i is pi(i)
+            actions[i] = {(*policy)(i, 0)};
+
+        // New rewards: every state-action awards 0 except (x, pi(x))
         float **rewards = new float*[n];
         for (int i=0; i<n; i++) {
-            rewards[i] = new float[max_action];
-            for (int a=0; a<max_action; a++) rewards[i][a] = 0.0;
+            rewards[i] = new float[max_action_id+1];
+            for (int a=0; a<=max_action_id; a++)
+                rewards[i][a] = 0.0;
         }
         rewards[x][(*policy)(x, 0)] = 1.0;
 

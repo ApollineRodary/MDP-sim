@@ -61,22 +61,24 @@ int main() {
 
     OfflineMDP mdp(N, actions, transitions, rewards);
     Policy policy = value_iteration(&mdp, N, 1e9, 1e-6);
-    print_policy(&policy);
+    show_policy(&policy);
     cout << endl;
 
     // Apply policy and estimate invariant measure
 
     Agent agent(&mdp, &policy);
-    vector<float> d = stationary_distribution(&agent, SIM_STEPS);
+    vector<float> d = invariant_measure_estimate(&agent, SIM_STEPS);
     cout << "Invariant measure after " << SIM_STEPS << " steps is estimated to be:" << endl;
-    for (float f: d) cout << setw(10) << f << " ";
+    for (float f: d)
+        cout << setw(12) << f << " ";
     cout << endl << endl;
 
     // Get invariant measure from value iteration
 
     vector<float> im = invariant_measure(&mdp, &policy);
-    cout << "Invariant measure with value iteration is estimated to be:" << endl;
-    for (float f: im) cout << setw(10) << f << " ";
+    cout << "Invariant measure with value iteration is supposed to be:" << endl;
+    for (float f: im)
+        cout << setw(12) << f << " ";
     cout << endl << endl;
 
     return 0;
