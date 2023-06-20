@@ -2,7 +2,6 @@
 #include <vector>
 #include <random>
 #include <iomanip>
-
 using namespace std;
 
 class MDP {

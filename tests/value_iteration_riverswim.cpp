@@ -1,5 +1,5 @@
 #include <iomanip>
-#include "../src/value_iteration.cpp"
+#include "../src/value_iteration.hpp"
 #define LEFT 0
 #define RIGHT 1
 #define N 10

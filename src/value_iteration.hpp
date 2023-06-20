@@ -1,4 +1,4 @@
-#include "mdp.cpp"
+#include "mdp.hpp"
 
 Policy value_iteration(OfflineMDP *mdp, int n, int max_steps, float eps, float *g) {
     /* 

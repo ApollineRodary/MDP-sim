@@ -1,5 +1,5 @@
 #include <vector>
-#include "../src/mdp.cpp"
+#include "../src/mdp.hpp"
 
 using namespace std;
 
