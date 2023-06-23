@@ -1,5 +1,11 @@
-#include <vector>
-#include <random>
+%module pymdp
+
+%{
+#define SWIG_FILE_WITH_INIT
+#include "../src/mdp.hpp"
+#include<vector>
+#include<random>
+%}
 
 using namespace std;
 

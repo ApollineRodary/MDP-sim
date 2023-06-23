@@ -1,4 +1,4 @@
-#include "mdp.hpp"
+#include "algorithms.hpp"
 
 Policy value_iteration(OfflineMDP *mdp, int n, int max_steps, float eps, float *g) {
     /* 
@@ -98,4 +98,26 @@ vector<float> invariant_measure(OfflineMDP *mdp, Policy *policy) {
         ans.push_back(g);
     }
     return ans;
+}
+
+vector<float> invariant_measure_estimate(Agent *agent, int steps) {
+    /**
+     * Get empirical estimate of invariant measure
+     * Agent uses its policy on its MDP starting from the MDP's state when calling the function
+     * Return value is frequency of visit of every state
+     */
+    
+    vector<float> frequency;
+    for (int x=0; x<agent->getMDP()->getStates(); x++)
+        frequency.push_back(0);
+
+    for (int i=0; i<steps; i++) {
+        agent->usePolicy();
+        frequency[agent->getMDP()->getState()]++;
+    }
+    
+    vector<float> d;
+    for (int f: frequency)
+        d.push_back(((float) f)/steps);   
+    return d;
 }
