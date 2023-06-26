@@ -3,6 +3,12 @@
 
 using namespace std;
 
+template<typename T>
+using Matrix = vector<vector<T>>;
+
+template<typename T>
+using Matrix3D = vector<vector<vector<T>>>;
+
 class MDP {
     /**
      *  Markov decision process with hidden information on transitions, actions and rewards, for use in RL
@@ -10,10 +16,9 @@ class MDP {
      */
 
     private:
-    int states;
-    vector<int> *actions;       // Available actions: actions[x] := vector of actions available from state x
-    float ***transitions;       // Transition kernel: transitions[x][a][y] := p(y | x, a)
-    float **rewards;            // Chance for reward: R(x, a) ~ B(rewards[x][a])
+    Matrix<int> &actions;           // Available actions: actions[x] := vector of actions available from state x
+    Matrix3D<float> &transitions;   // Transition kernel: transitions[x][a][y] := p(y | x, a)
+    Matrix<float> &rewards;         // Chance for reward: R(x, a) ~ B(rewards[x][a])
     float discount;
     int state;
     int t;
@@ -23,13 +28,14 @@ class MDP {
     uniform_real_distribution<> uniform;
 
     public:
-    MDP(int states, vector<int> *actions, float ***transitions, float **rewards, float discount);
-    MDP(int states, vector<int> *actions, float ***transitions, float **rewards) : MDP(states, actions, transitions, rewards, 1.0f) {}
-    float makeAction(int a);
-    int getStates();
+    MDP(Matrix<int> &actions, Matrix3D<float> &transitions, Matrix<float> &rewards, float discount);
+    MDP(Matrix<int> &actions, Matrix3D<float> &transitions, Matrix<float> &rewards) : MDP(actions, transitions, rewards, 1.0f) {}
+    float makeAction(int action);
     int getState();
+    int getStates();
+    int getMaxAction();
     int getTime();
-    vector<int> getAvailableActions();
+    vector<int> &getAvailableActions();
     float getDiscount();
 };
 
@@ -39,36 +45,36 @@ class OfflineMDP: public MDP {
      */
 
     public:
-    vector<int> *actions;
-    float ***transitions;
-    float **rewards;
-    OfflineMDP(int states, vector<int> *actions, float ***transitions, float **rewards, float discount);
-    OfflineMDP(int states, vector<int> *actions, float ***transitions, float **rewards) : OfflineMDP(states, actions, transitions, rewards, 1.0f) {}
-    vector<int> *getActions();
-    float getRewards(int x, int a);
-    float getTransitionChance(int x, int a, int y);
-    float ***getTransitionKernel();
-    vector<int> getAvailableActions(int x);
+    Matrix<int> &actions;
+    Matrix3D<float> &transitions;
+    Matrix<float> &rewards;
+    
+    OfflineMDP(Matrix<int> &actions, Matrix3D<float> &transitions, Matrix<float> &rewards, float discount) : MDP(actions, transitions, rewards, discount), actions(actions), transitions(transitions), rewards(rewards) {}
+    OfflineMDP(Matrix<int> &actions, Matrix3D<float> &transitions, Matrix<float> &rewards) : OfflineMDP(actions, transitions, rewards, 1.0f) {}
+    Matrix<int> &getActions();
+    float getRewards(int x, int action);
+    float getTransitionChance(int x, int action, int y);
+    Matrix3D<float> &getTransitionKernel();
+    vector<int> &getAvailableActions(int x);
     void show();
 };
 
 struct Policy {
-    const vector<vector<int>> v;
+    const Matrix<int> v;
     int operator()(int state, int t);
 };
 
 class Agent {
     private:
-    MDP *mdp;
-    Policy *policy;
+    MDP &mdp;
+    Policy &policy;
     
     public:
-    Agent(MDP *mdp) : mdp(mdp) {}
-    Agent(MDP *mdp, Policy *policy) : mdp(mdp), policy(policy) {}
-    MDP *getMDP();
-    int makeRandomAction(float *f);
+    Agent(MDP &mdp, Policy &policy) : mdp(mdp), policy(policy) {}
+    MDP &getMDP();
+    int makeRandomAction(float &f);
     int makeRandomAction();
     int usePolicy();
 };
 
-void show_policy(Policy *policy);
+void show_policy(Policy &policy);

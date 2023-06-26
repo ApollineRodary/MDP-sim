@@ -2,13 +2,7 @@
 #include <iomanip>
 #include "mdp.hpp"
 
-MDP::MDP(int states, vector<int> *actions, float ***transitions, float **rewards, float discount) {
-    this->states = states;
-    this->actions = actions;
-    this->transitions = transitions;
-    this->rewards = rewards;
-    this->discount = discount;
-
+MDP::MDP(Matrix<int> &actions, Matrix3D<float> &transitions, Matrix<float> &rewards, float discount) : actions(actions), transitions(transitions), rewards(rewards), discount(discount) {
     max_reward = 1.0f;
     state = 0;
     t = 0;
@@ -21,11 +15,11 @@ MDP::MDP(int states, vector<int> *actions, float ***transitions, float **rewards
     this->uniform = uniform;
 }
 
-float MDP::makeAction(int a) {
+float MDP::makeAction(int action) {
     // Check if action is available from the current state
     bool valid = false;
-    for (int a_: actions[state]) {
-        if (a_ == a) {
+    for (int action_: actions[state]) {
+        if (action_ == action) {
             valid = true;
             break;
         }
@@ -35,12 +29,12 @@ float MDP::makeAction(int a) {
     t++;
 
     // Draw next state
-    float *chances = transitions[state][a];
-    discrete_distribution<> d{chances, chances+states};
+    vector<float> chances = transitions[state][action];
+    discrete_distribution<> d{chances.begin(), chances.end()};
     int next_state = d(gen);
 
     // Draw rewards (Bernoulli)
-    float chance = rewards[state][a];
+    float chance = rewards[state][action];
     float reward = (uniform(gen)<=chance) ? max_reward : 0.0f;
 
     total_rewards += reward;
@@ -49,19 +43,23 @@ float MDP::makeAction(int a) {
     return reward;
 }
 
-int MDP::getStates() {
-    return states;
-}
-
 int MDP::getState() {
     return state;
+}
+
+int MDP::getStates() {
+    return transitions.size();
+}
+
+int MDP::getMaxAction() {
+    return transitions[0].size();
 }
 
 int MDP::getTime() {
     return t;
 }
 
-vector<int> MDP::getAvailableActions() {
+vector<int> &MDP::getAvailableActions() {
     return actions[getState()];
 }
 
@@ -69,54 +67,52 @@ float MDP::getDiscount() {
     return discount;
 }
 
-OfflineMDP::OfflineMDP(int states, vector<int> *actions, float ***transitions, float **rewards, float discount) : MDP(states, actions, transitions, rewards, discount) {
-    // Save separate copy of all hidden pieces of information
-    this->actions = actions;
-    this->transitions = transitions;
-    this->rewards = rewards;
-}
-
-vector<int> *OfflineMDP::getActions() {
+Matrix<int> &OfflineMDP::getActions() {
     /* Get available actions for all states in the MDP */
     return actions;
 }
 
-float OfflineMDP::getRewards(int x, int a) {
+float OfflineMDP::getRewards(int x, int action) {
     /* Get chance of rewards for a given state-action pair */
-    return rewards[x][a];
+    return rewards[x][action];
 }
 
-float OfflineMDP::getTransitionChance(int x, int a, int y) {
+float OfflineMDP::getTransitionChance(int x, int action, int y) {
     /* Get chance of transition from state x to state y with action a (i.e. p(y|x,a)) */
-    return transitions[x][a][y];
+    int n = getStates();
+    int a = getMaxAction();
+    if (x<0 || x>=n || y<0 || y>=n || action<0 || action>=a)
+        throw invalid_argument("bruh");
+    return transitions[x][action][y];
 }
 
-float ***OfflineMDP::getTransitionKernel() {
+Matrix3D<float> &OfflineMDP::getTransitionKernel() {
     /* Get transition kernel, i.e. p(y|x,a) for all x, a, y */
     return transitions;
 }
 
-vector<int> OfflineMDP::getAvailableActions(int x) {
+vector<int> &OfflineMDP::getAvailableActions(int x) {
     /* Get available actions from a given state */
     return actions[x];
 }
-        
+
 void OfflineMDP::show() {
     /* Display all MDP information */
 
-    // Number of states
+    // Number of states/actions
     int n = getStates();
-    cout << "Showing MDP with " << n << " states" << endl << endl;
+    int a = getMaxAction();
+    cout << "Showing MDP with " << n << " states and " << a << " actions" << endl << endl;
     
     // Available actions from every state
     cout << "Actions:" << endl;
     int max_action = 0;
     for (int x=0; x<n; x++) {
         cout << "- " << x << ": ";
-        for (int a: getAvailableActions(x)) {
-            cout << a << " ";
-            if (a > max_action)
-                max_action = a;
+        for (int action: getAvailableActions(x)) {
+            cout << action << " ";
+            if (action > max_action)
+                max_action = action;
         }
         cout << endl;
     }
@@ -124,11 +120,11 @@ void OfflineMDP::show() {
     
     // Transition kernel
     cout << "Transitions:" << endl;
-    for (int a=0; a<=max_action; a++) {
-        cout << "   [Showing transition matrix for action " << a << "]" << endl;
+    for (int action=0; action<=max_action; action++) {
+        cout << "   [Showing transition matrix for action " << action << "]" << endl;
         for(int i=0; i<n; i++) {
             for (int j=0; j<n; j++)
-                cout << setw(8) << transitions[i][a][j] << " ";
+                cout << setw(8) << getTransitionChance(i, action, j) << " ";
             cout << endl;
         }
         cout << endl;
@@ -139,8 +135,8 @@ void OfflineMDP::show() {
     cout << "Rewards:" << endl;
     for (int x=0; x<n; x++) {
         cout << "  For state " << x << ": ";
-        for (int a=0; a<=max_action; a++)
-            cout << setw(8) << rewards[x][a] << " ";
+        for (int action=0; action<=max_action; action++)
+            cout << setw(8) << getRewards(x, action) << " ";
         cout << endl;
     }
     cout << endl;
@@ -151,19 +147,19 @@ int Policy::operator()(int state, int t) {
     return v[t][state];
 }
 
-MDP *Agent::getMDP() {
+MDP &Agent::getMDP() {
     return mdp;
 }
 
-int Agent::makeRandomAction(float *f) {
+int Agent::makeRandomAction(float &f) {
     /**
      * Chooses and makes a random action among those available from the current state
-     * Saves rewards gotten to f
+     * Saves rewards to f
      * Returns ID of action chosen
      */
-    vector<int> actions = mdp->getAvailableActions();
+    vector<int> actions = mdp.getAvailableActions();
     int action = actions[rand() % actions.size()];
-    *f = mdp->makeAction(action);
+    f = mdp.makeAction(action);
     return action;
 }
 
@@ -173,7 +169,7 @@ int Agent::makeRandomAction() {
      * Returns ID of action chosen
      */
     float f;
-    return makeRandomAction(&f);
+    return makeRandomAction(f);
 }
 
 int Agent::usePolicy() {
@@ -181,17 +177,17 @@ int Agent::usePolicy() {
      * Plays one step of the agent's policy
      * Returns action chosen, whether valid or not
      */
-    int state = mdp->getState();
-    int t = mdp->getTime();
-    int action = (*policy)(state, t);
-    mdp->makeAction(action);
+    int state = mdp.getState();
+    int t = mdp.getTime();
+    int action = policy(state, t);
+    mdp.makeAction(action);
     return action;
 }
 
-void show_policy(Policy *policy) {
-    int steps = size(policy->v);
+void show_policy(Policy &policy) {
+    int steps = size(policy.v);
     if (steps>1)
-        cout << "Showing policy with " << size(policy->v) << " steps:" << endl;
+        cout << "Showing policy with " << size(policy.v) << " steps:" << endl;
     else if (steps==1)
         cout << "Showing stationary policy:";
     else {
@@ -200,7 +196,7 @@ void show_policy(Policy *policy) {
     }
     
     int t=0;
-    for (auto pol: policy->v) {
+    for (auto pol: policy.v) {
         t++;
         cout << "(" << t << "/" << steps << ") ";
         for (int a: pol)
