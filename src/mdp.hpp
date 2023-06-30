@@ -36,6 +36,8 @@ class MDP {
     int getMaxAction();
     int getTime();
     vector<int> &getAvailableActions();
+    vector<int> &getAvailableActions(int x);
+    Matrix<int> &getActions();
     float getDiscount();
 };
 
@@ -51,11 +53,9 @@ class OfflineMDP: public MDP {
     
     OfflineMDP(Matrix<int> &actions, Matrix3D<float> &transitions, Matrix<float> &rewards, float discount) : MDP(actions, transitions, rewards, discount), actions(actions), transitions(transitions), rewards(rewards) {}
     OfflineMDP(Matrix<int> &actions, Matrix3D<float> &transitions, Matrix<float> &rewards) : OfflineMDP(actions, transitions, rewards, 1.0f) {}
-    Matrix<int> &getActions();
     float getRewards(int x, int action);
     float getTransitionChance(int x, int action, int y);
     Matrix3D<float> &getTransitionKernel();
-    vector<int> &getAvailableActions(int x);
     void show();
 };
 
@@ -74,6 +74,7 @@ class Agent {
     MDP &getMDP();
     int makeRandomAction(float &f);
     int makeRandomAction();
+    int usePolicy(float &f);
     int usePolicy();
 };
 

@@ -63,13 +63,17 @@ vector<int> &MDP::getAvailableActions() {
     return actions[getState()];
 }
 
-float MDP::getDiscount() {
-    return discount;
+vector<int> &MDP::getAvailableActions(int x) {
+    return actions[x];
 }
 
-Matrix<int> &OfflineMDP::getActions() {
-    /* Get available actions for all states in the MDP */
+Matrix<int> &MDP::getActions() {
     return actions;
+}
+
+
+float MDP::getDiscount() {
+    return discount;
 }
 
 float OfflineMDP::getRewards(int x, int action) {
@@ -89,11 +93,6 @@ float OfflineMDP::getTransitionChance(int x, int action, int y) {
 Matrix3D<float> &OfflineMDP::getTransitionKernel() {
     /* Get transition kernel, i.e. p(y|x,a) for all x, a, y */
     return transitions;
-}
-
-vector<int> &OfflineMDP::getAvailableActions(int x) {
-    /* Get available actions from a given state */
-    return actions[x];
 }
 
 void OfflineMDP::show() {
@@ -172,16 +171,26 @@ int Agent::makeRandomAction() {
     return makeRandomAction(f);
 }
 
-int Agent::usePolicy() {
+int Agent::usePolicy(float &f) {
     /**
      * Plays one step of the agent's policy
+     * Saves rewards to f
      * Returns action chosen, whether valid or not
      */
     int state = mdp.getState();
     int t = mdp.getTime();
     int action = policy(state, t);
-    mdp.makeAction(action);
+    f = mdp.makeAction(action);
     return action;
+}
+
+int Agent::usePolicy() {
+    /**
+     * Plays one step of the agent's policy
+     * Returns action chosen
+     */
+    float f;
+    return makeRandomAction(f);
 }
 
 void show_policy(Policy &policy) {
