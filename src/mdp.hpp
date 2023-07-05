@@ -1,3 +1,6 @@
+#ifndef MDP_HEADER
+#define MDP_HEADER
+
 #include <vector>
 #include <random>
 
@@ -79,3 +82,5 @@ class Agent {
 };
 
 void show_policy(Policy &policy);
+
+#endif
