@@ -231,7 +231,7 @@ Policy extended_value_iteration(MDP &mdp, Matrix3D<double> &estimated_transition
 vector<double> ucrl2(MDP &mdp, float delta, int max_steps) {
     int t=0;
     double total_rewards;
-    vector<double> total_rewards_v;
+    vector<double> rewards_v;
 
     int states = mdp.getStates();
     int actions = mdp.getMaxAction();
@@ -291,12 +291,11 @@ vector<double> ucrl2(MDP &mdp, float delta, int max_steps) {
             observed_rewards_during_episode[x][a] += rewards;
             total_rewards += rewards;
             
-            state = y;
+            rewards_v.push_back(rewards);
             t++;
-            if (t%1000 == 0)
-                total_rewards_v.push_back(total_rewards);
             if (t==max_steps)
-                return total_rewards_v;
+                return rewards_v;
+            state = y;
         }
     }
     return {};
