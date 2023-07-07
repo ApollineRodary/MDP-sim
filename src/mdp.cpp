@@ -190,7 +190,7 @@ int Agent::usePolicy() {
      * Returns action chosen
      */
     float f;
-    return makeRandomAction(f);
+    return usePolicy(f);
 }
 
 void show_policy(Policy &policy) {
@@ -198,7 +198,7 @@ void show_policy(Policy &policy) {
     if (steps>1)
         cout << "Showing policy with " << size(policy.v) << " steps:" << endl;
     else if (steps==1)
-        cout << "Showing stationary policy:";
+        cout << "Showing stationary policy: ";
     else {
         cout << "Asking to show empty policy, discarding";
         return;
