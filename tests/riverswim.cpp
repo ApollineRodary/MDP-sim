@@ -2,11 +2,12 @@
 #include <iomanip>
 #include <random>
 #include "src/algorithms.hpp"
+#include "src/io.hpp"
 #include "src/mdp/riverswim.cpp"
 #include "include/matplotlib-cpp/matplotlibcpp.h"
 
-#define N 15
-#define SIM_STEPS 100000
+#define N 5
+#define SIM_STEPS 1e5
 #define SIM_STEPS_UCRL 1e7
 
 using namespace std;
@@ -21,7 +22,7 @@ int main() {
     OfflineMDP mdp(actions, transitions, rewards);
 
     // Find and display optimal policy with value iteration algorithm
-    Policy policy = value_iteration(mdp, 1e5, 1e-5);
+    Policy policy = get<0>(value_iteration(mdp, 1e5, 1e-5));
     show_policy(policy);
     cout << endl;
 
@@ -51,18 +52,34 @@ int main() {
     int duration = SIM_STEPS_UCRL;
     History ucrl_history = ucrl2(rl_mdp, 1e-5, duration);
 
+    // Compute gap regrets
+    double total_rl_rewards=0, total_gap_regret=0;
+    Matrix<double> gap_regret_matrix(N, vector<double>(2));
+    for (int x=0; x<N; x++)
+        for (int a=0; a<1; a++)
+            gap_regret_matrix[x][a] = gap_regret(x, a, mdp);
+    
+    // Plot empirical regrets and gap regrets
+    vector<double> regrets;
+    vector<double> gap_regrets;
+    
     int i=0;
-    double total_rl_rewards=0;
-    vector<double> regret;
     for (Event event: ucrl_history) {
         i++;
+        show_loading_bar("Plotting regret...", i, ucrl_history.size());
         
         double reward = get<2>(event);
         total_rl_rewards += reward;
-        regret.push_back(i*opt_rewards - total_rl_rewards);
+        double regret = i*opt_rewards - total_rl_rewards;
+        regrets.push_back(regret);
+
+        int x=get<0>(event), a=get<1>(event);
+        total_gap_regret += gap_regret_matrix[x][a];
+        gap_regrets.push_back(total_gap_regret);
     }
 
-    plt::plot(regret);
+    plt::plot(regrets);
+    plt::plot(gap_regrets);
     plt::save("ucrl2_regret.pdf");
 
     cout << endl;

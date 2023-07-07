@@ -1,14 +1,14 @@
 #include <stdexcept>
 #include <algorithm>
 #include "algorithms.hpp"
-#include "io.cpp"
+#include "io.hpp"
 #include <iostream>
 #include <iomanip>
 
-Policy value_iteration(OfflineMDP &mdp, int max_steps, float eps, float &g) {
+tuple<Policy, double, vector<double>> value_iteration(OfflineMDP &mdp, int max_steps, float eps) {
     /* 
         Runs value iteration on an MDP with n states until the span of the difference gets lower than eps
-        Returns corresponding policy and sends corresponding gain to g
+        Returns the corresponding policy, the gain and the bias
     */
 
     if (eps<=0)
@@ -17,13 +17,11 @@ Policy value_iteration(OfflineMDP &mdp, int max_steps, float eps, float &g) {
     int n = mdp.getStates();
     int a = mdp.getMaxAction();
 
-    float v[n];
-    float w[n];
-    int best_action[n];
-    
-    for (int i=0; i<n; i++) v[i] = 0.0;
+    vector<double> v(n, 0.0);
+    vector<double> w(n);
+    vector<int> best_action(n);
 
-    for (int t=0; t<max_steps; t++) {
+    for (int t=0;; t++) {
         // Compute w out of v (Bellman equation)
         for (int x=0; x<n; x++) {
             vector<int> actions = mdp.getAvailableActions(x);
@@ -43,36 +41,30 @@ Policy value_iteration(OfflineMDP &mdp, int max_steps, float eps, float &g) {
             w[x] = max_q;
         }
 
-        float max_dv = -INFINITY;
-        float min_dv = INFINITY;
+        double max_dv = -INFINITY;
+        double min_dv = INFINITY;
         for (int x=0; x<n; x++) {
-            float dv = w[x]-v[x];
+            double dv = w[x]-v[x];
             if (dv > max_dv)
                 max_dv = dv;
             if (dv < min_dv)
                 min_dv = dv;
             v[x] = w[x];
         }
-        float v0 = v[0];
+        double v0 = v[0];
         for (int x=0; x<n; x++)
             v[x] -= v0;
         
-        if (max_dv - min_dv < eps) {
+        double span = max_dv-min_dv;
+        if (span<eps || t==max_steps) {
             vector<int> pol;
-            g = (max_dv + min_dv)/2;
+            double g = (max_dv + min_dv)/2;
             for (int x=0; x<n; x++)
                 pol.push_back(best_action[x]);
             Policy policy = {{pol}};
-            return policy;
+            return tuple(policy, g, v);
         }
     }
-    Policy policy = {{}};
-    return policy;
-}
-
-Policy value_iteration(OfflineMDP &mdp, int max_steps, float eps) {
-    float g;
-    return (value_iteration(mdp, max_steps, eps, g));
 }
 
 vector<float> invariant_measure(OfflineMDP &mdp, Policy &policy) {
@@ -91,10 +83,9 @@ vector<float> invariant_measure(OfflineMDP &mdp, Policy &policy) {
         // Every action awards 0 except from state x
         Matrix<float> rewards(n, vector<float>(a, 0.0));
         rewards[x][policy(x, 0)] = 1.0;
-
-        float g;
+        
         OfflineMDP nmdp = OfflineMDP(actions, mdp.getTransitionKernel(), rewards);
-        value_iteration(nmdp, 1e5, 1e-5, g);
+        double g = get<1>(value_iteration(nmdp, 1e5, 1e-5));
         ans.push_back(g);
     }
     return ans;
@@ -118,6 +109,19 @@ vector<float> invariant_measure_estimate(Agent &agent, int steps) {
     for (int f: frequency)
         d.push_back(((float) f)/steps);   
     return d;
+}
+
+double gap_regret(int x, int a, OfflineMDP &mdp) {
+    auto vi_data = value_iteration(mdp, 1e5, 1e-5);
+    double g = get<1>(vi_data);
+    vector<double> h = get<2>(vi_data);
+    
+    double reward_gap = g - mdp.getRewards(x, a);
+    double bias_gap = h[x];
+    for (int y=0; y<mdp.getStates(); y++)
+        bias_gap -= mdp.getTransitionChance(x, a, y)*h[y];
+
+    return reward_gap + bias_gap;
 }
 
 double optimize(vector<double> &p, vector<double> &u, double eps) {
