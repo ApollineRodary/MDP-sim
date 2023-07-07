@@ -3,11 +3,14 @@
 #include <random>
 #include "src/algorithms.hpp"
 #include "src/mdp/riverswim.cpp"
+#include "include/matplotlib-cpp/matplotlibcpp.h"
 
-#define N 3
-#define SIM_STEPS 1e6
+#define N 15
+#define SIM_STEPS 100000
+#define SIM_STEPS_UCRL 1e7
 
 using namespace std;
+namespace plt = matplotlibcpp;
 
 int main() {
     auto mdp_info = Riverswim(N, 0.35, 0.05, 0.1, 0.9);
@@ -18,7 +21,7 @@ int main() {
     OfflineMDP mdp(actions, transitions, rewards);
 
     // Find and display optimal policy with value iteration algorithm
-    Policy policy = value_iteration(mdp, 1e6, 1e-6);
+    Policy policy = value_iteration(mdp, 1e5, 1e-5);
     show_policy(policy);
     cout << endl;
 
@@ -41,17 +44,27 @@ int main() {
     double opt_rewards = 0.0;
     for (int i=0; i<N; i++)
         opt_rewards += im[i]*mdp.getRewards(i, policy(i, 0));
+    cout << "That's a gain of " << opt_rewards << endl << endl;
     
     // Run UCRL2
     MDP rl_mdp(actions, transitions, rewards);
-    int duration = 100000;
-    vector<double> rl_rewards = ucrl2(rl_mdp, 0.01, duration);
+    int duration = SIM_STEPS_UCRL;
+    History ucrl_history = ucrl2(rl_mdp, 1e-5, duration);
 
     int i=0;
-    for (double r: rl_rewards) {
+    double total_rl_rewards=0;
+    vector<double> regret;
+    for (Event event: ucrl_history) {
         i++;
-        cout << setw(10) << opt_rewards*i*1000 - r;
+        
+        double reward = get<2>(event);
+        total_rl_rewards += reward;
+        regret.push_back(i*opt_rewards - total_rl_rewards);
     }
+
+    plt::plot(regret);
+    plt::save("ucrl2_regret.pdf");
+
     cout << endl;
 
     return 0;
