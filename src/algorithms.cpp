@@ -1,6 +1,7 @@
 #include <stdexcept>
 #include <algorithm>
 #include "algorithms.hpp"
+#include "io.cpp"
 #include <iostream>
 #include <iomanip>
 
@@ -93,7 +94,7 @@ vector<float> invariant_measure(OfflineMDP &mdp, Policy &policy) {
 
         float g;
         OfflineMDP nmdp = OfflineMDP(actions, mdp.getTransitionKernel(), rewards);
-        value_iteration(nmdp, 1e6, 1e-6, g);
+        value_iteration(nmdp, 1e5, 1e-5, g);
         ans.push_back(g);
     }
     return ans;
@@ -106,9 +107,7 @@ vector<float> invariant_measure_estimate(Agent &agent, int steps) {
      * Return value is frequency of visit of every state
      */
     
-    vector<float> frequency;
-    for (int x=0; x<agent.getMDP().getStates(); x++)
-        frequency.push_back(0);
+    vector<float> frequency(agent.getMDP().getStates(), 0.0);
 
     for (int i=0; i<steps; i++) {
         agent.usePolicy();
@@ -138,21 +137,20 @@ double optimize(vector<double> &p, vector<double> &u, double eps) {
     for (int i=0; i<n; i++)
         s[i] = i;
     stable_sort(s.begin(), s.end(), [&](int i, int j) {return u[i] > u[j];});
-
-    // Add as much weight as possible to q_i with i maximizing u_i
+    
+    // Create q similar to p
     vector<double> q(n);
     for (int i=0; i<n; i++)
         q[s[i]] = p[s[i]];
     
-    // Remove as much weight as possible to q_j with j minimizing u_j until it evens out 
+    // Add as much weight as possible to q_i for i maximizing u_i, taking from q_j for j minimizing u_j
     int i=0, j=n-1;
     while (i<j) {
-        float m = 0.5*eps;
-        if (1.0-q[s[i]] < m) m = 1.0 - q[s[i]];
-        if (q[s[j]] < m) m = q[s[j]];
+        double m = min({0.5*eps, 1.0-q[s[i]], q[s[j]]});
 
         q[s[i]] += m;
         q[s[j]] -= m;
+        
         eps -= 2*m;
         if (m == eps*0.5)
             break;
@@ -161,6 +159,9 @@ double optimize(vector<double> &p, vector<double> &u, double eps) {
         else
             j--;
     }
+
+    for (int i=0; i<n; i++)
+        q[i] = round(q[i]*1e5) / 1e5;
 
     return inner_product(q.begin(), q.end(), u.begin(), 0.0);
 }
@@ -182,13 +183,13 @@ Policy extended_value_iteration(MDP &mdp, Matrix3D<double> &estimated_transition
     vector<double> w(n);
     vector<int> best_action(n);
     
-    for (int t=0; t<max_steps; t++) {
+    for (int t=0;; t++) {
         for (int x=0; x<n; x++) {
             float max_q = -INFINITY;
             for (int action: mdp.getAvailableActions(x)) {
                 double r_opt = estimated_rewards[x][action] + reward_uncertainty[x][action];
-                double p_opt = optimize(estimated_transition_chances[x][action], v, transition_chance_uncertainty[x][action]/2);
-                double q = 0.5 * (r_opt + p_opt);
+                double p_opt = optimize(estimated_transition_chances[x][action], v, transition_chance_uncertainty[x][action]);
+                double q = r_opt + p_opt;
                 
                 if (q>max_q) {
                     // max_q =          max_{a \in A(x)} Q_{t+1}*(x, a)
@@ -215,23 +216,24 @@ Policy extended_value_iteration(MDP &mdp, Matrix3D<double> &estimated_transition
         for (int x=0; x<n; x++)
             v[x] -= v0;
         
-        if (max_dv - min_dv < eps) {
-            vector<int> pol;
-            for (int x=0; x<n; x++)
-                pol.push_back(best_action[x]);
-            Policy policy = {{pol}};
-            return policy;
-        }
+        float span = max_dv - min_dv;
+        if (span < eps || t > max_steps)
+            break;
     }
-    cout << "Extended value iteration did not end within " << max_steps << " steps" << endl;
-    Policy policy = {{}};
+
+    vector<int> pol;
+    for (int x=0; x<n; x++)
+        pol.push_back(best_action[x]);
+    Policy policy = {{pol}};
+
     return policy;
+
 }
 
-vector<double> ucrl2(MDP &mdp, float delta, int max_steps) {
-    int t=0;
+History ucrl2(MDP &mdp, float delta, int max_steps) {
+    int t=1;
     double total_rewards;
-    vector<double> rewards_v;
+    History history(0);
 
     int states = mdp.getStates();
     int actions = mdp.getMaxAction();
@@ -275,7 +277,7 @@ vector<double> ucrl2(MDP &mdp, float delta, int max_steps) {
         }
 
         // Compute optimal policy for optimist MDP (EVI)
-        Policy policy = extended_value_iteration(mdp, estimated_transition_chances, estimated_rewards, transition_chance_uncertainty, reward_uncertainty, 1000, 0.000001);
+        Policy policy = extended_value_iteration(mdp, estimated_transition_chances, estimated_rewards, transition_chance_uncertainty, reward_uncertainty, 1000, 1.0/sqrt(start)); // TODO change eps
         Agent agent = Agent(mdp, policy);
 
         while (visits_during_episode[state][policy(state, 0)] < max(1, visits_before_episode[state][policy(state, 0)])) {
@@ -291,10 +293,14 @@ vector<double> ucrl2(MDP &mdp, float delta, int max_steps) {
             observed_rewards_during_episode[x][a] += rewards;
             total_rewards += rewards;
             
-            rewards_v.push_back(rewards);
-            t++;
+            Event event(x, a, rewards);
+            history.push_back(event);
+
             if (t==max_steps)
-                return rewards_v;
+                return history;
+            
+            t++;
+            show_loading_bar("Running UCRL2...", t, max_steps);
             state = y;
         }
     }
