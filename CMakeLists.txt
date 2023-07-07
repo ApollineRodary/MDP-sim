@@ -12,6 +12,7 @@ find_package(Python3 REQUIRED COMPONENTS Development)
 set(SOURCES
     src/mdp.cpp
     src/algorithms.cpp
+    src/io.cpp
 )
 
 add_executable(riverswim.exe tests/riverswim.cpp ${SOURCES})
