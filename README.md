@@ -27,3 +27,5 @@ The project contains C++ headers to represent and simulate Markov decision proce
 - Getting a near-optimal policy on average with value iteration
 - Estimating a policy's invariant measure
 - Getting a policy's invariant measure with value iteration
+- Running UCRL2 on an MDP and getting the resulting history
+- Getting regret and gap-regret from a history of plays on an MDP
