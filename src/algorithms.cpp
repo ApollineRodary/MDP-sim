@@ -234,8 +234,13 @@ Policy extended_value_iteration(MDP &mdp, Matrix3D<double> &estimated_transition
 
 }
 
-History ucrl2(MDP &mdp, float delta, int max_steps) {
-    int t=1;
+History ucrl2(MDP &mdp, float delta, int steps, History context) {
+    /*
+        Plays UCRL2 on MDP mdp for a given duration, given the previous history provided by context
+        Returns observed history
+    */
+    
+    int t = context.size() + 1;
     double total_rewards;
     History history(0);
 
@@ -255,7 +260,25 @@ History ucrl2(MDP &mdp, float delta, int max_steps) {
     Matrix3D<double> estimated_transition_chances(states, Matrix<double>(actions, vector<double>(states, 0)));
     Matrix<double> transition_chance_uncertainty(states, vector<double>(actions, 0.0));
 
-    for (int k=1; k>0; k++) {
+    // Read previous history
+    int x=state, y=state, a;
+    double r;
+    for (Event e: context) {
+        x = get<0>(e);
+        a = get<1>(e);
+        y = get<2>(e);
+        r = get<3>(e);
+
+        visits_during_episode[x][a]++;
+        observed_rewards_during_episode[x][a] += r;
+        observed_transitions_during_episode[x][a][y]++;
+    }
+    state = y;
+
+    // Start UCRL2
+    int k=0;
+    while (true) {
+        k++;
         int start = t;
 
         // Initialize state-action counts, accumulated rewards and transition counts for the current episode
@@ -284,6 +307,7 @@ History ucrl2(MDP &mdp, float delta, int max_steps) {
         Policy policy = extended_value_iteration(mdp, estimated_transition_chances, estimated_rewards, transition_chance_uncertainty, reward_uncertainty, 1000, 1.0/sqrt(start)); // TODO change eps
         Agent agent = Agent(mdp, policy);
 
+        // Iterate episode until a state-action pair has been visited in the current episode as many times as all episodes prior
         while (visits_during_episode[state][policy(state, 0)] < max(1, visits_before_episode[state][policy(state, 0)])) {
             float rewards;
             agent.usePolicy(rewards);
@@ -297,16 +321,15 @@ History ucrl2(MDP &mdp, float delta, int max_steps) {
             observed_rewards_during_episode[x][a] += rewards;
             total_rewards += rewards;
             
-            Event event(x, a, rewards);
+            Event event(x, a, y, rewards);
             history.push_back(event);
 
-            if (t==max_steps)
+            if (t==steps)
                 return history;
             
             t++;
-            show_loading_bar("Running UCRL2...", t, max_steps);
+            show_loading_bar("Running UCRL2...", t, steps);
             state = y;
         }
     }
-    return {};
 }

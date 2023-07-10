@@ -6,8 +6,8 @@
 #include "src/mdp/riverswim.cpp"
 #include "include/matplotlib-cpp/matplotlibcpp.h"
 
-#define N 5
-#define SIM_STEPS 1e5
+#define N 8
+#define SIM_STEPS 1e7
 #define SIM_STEPS_UCRL 1e7
 
 using namespace std;
@@ -50,7 +50,7 @@ int main() {
     // Run UCRL2
     MDP rl_mdp(actions, transitions, rewards);
     int duration = SIM_STEPS_UCRL;
-    History ucrl_history = ucrl2(rl_mdp, 1e-5, duration);
+    History ucrl_history = ucrl2(rl_mdp, 1e-5, duration, {});
 
     // Compute gap regrets
     double total_rl_rewards=0, total_gap_regret=0;
@@ -68,7 +68,7 @@ int main() {
         i++;
         show_loading_bar("Plotting regret...", i, ucrl_history.size());
         
-        double reward = get<2>(event);
+        double reward = get<3>(event);
         total_rl_rewards += reward;
         double regret = i*opt_rewards - total_rl_rewards;
         regrets.push_back(regret);
