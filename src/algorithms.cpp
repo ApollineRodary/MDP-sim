@@ -107,7 +107,7 @@ vector<float> invariant_measure_estimate(Agent &agent, int steps) {
     
     vector<float> d;
     for (int f: frequency)
-        d.push_back(((float) f)/steps);   
+        d.push_back(((float) f)/steps);
     return d;
 }
 
@@ -170,7 +170,7 @@ double optimize(vector<double> &p, vector<double> &u, double eps) {
     return inner_product(q.begin(), q.end(), u.begin(), 0.0);
 }
 
-Policy extended_value_iteration(MDP &mdp, Matrix3D<double> &estimated_transition_chances, Matrix<double> &estimated_rewards, Matrix<double> &transition_chance_uncertainty, Matrix<double> &reward_uncertainty, int max_steps, float eps) {
+Policy extended_value_iteration(MDP &mdp, ExtendedMDP &extended_mdp, int max_steps, float eps) {
     /**
      * Runs extended value iteration until span of u-value is below eps and returns corresponding policy
      * Extended MDP has:
@@ -191,8 +191,8 @@ Policy extended_value_iteration(MDP &mdp, Matrix3D<double> &estimated_transition
         for (int x=0; x<n; x++) {
             float max_q = -INFINITY;
             for (int action: mdp.getAvailableActions(x)) {
-                double r_opt = estimated_rewards[x][action] + reward_uncertainty[x][action];
-                double p_opt = optimize(estimated_transition_chances[x][action], v, transition_chance_uncertainty[x][action]);
+                double r_opt = extended_mdp.getOptimistReward(x, action);
+                double p_opt = optimize(extended_mdp.estimated_transition_chances[x][action], v, extended_mdp.transition_chance_uncertainty[x][action]);
                 double q = r_opt + p_opt;
                 
                 if (q>max_q) {
@@ -233,7 +233,7 @@ Policy extended_value_iteration(MDP &mdp, Matrix3D<double> &estimated_transition
     return policy;
 }
 
-pair<History, vector<int>> ucrl2(MDP &mdp, float delta, int steps, int episodes = 0, History &context = nothing) {
+pair<History, EpisodeHistory> ucrl2(MDP &mdp, float delta, int steps, int episodes, const History &context) {
     /*
         Plays UCRL2 on MDP mdp for a given duration, given the previous history provided by context
         Returns observed history and vector of episode start times
@@ -242,8 +242,8 @@ pair<History, vector<int>> ucrl2(MDP &mdp, float delta, int steps, int episodes 
     int t = context.size() + 1;
     double total_rewards;
 
-    History history;
-    vector<int> episode_history;
+    History history(0);
+    EpisodeHistory episode_history;
 
     int states = mdp.getStates();
     int actions = mdp.getMaxAction();
@@ -260,6 +260,7 @@ pair<History, vector<int>> ucrl2(MDP &mdp, float delta, int steps, int episodes 
     Matrix<double> reward_uncertainty(states, vector<double>(actions, 0.0));
     Matrix3D<double> estimated_transition_chances(states, Matrix<double>(actions, vector<double>(states, 0)));
     Matrix<double> transition_chance_uncertainty(states, vector<double>(actions, 0.0));
+    ExtendedMDP extended_mdp(estimated_rewards, reward_uncertainty, estimated_transition_chances, transition_chance_uncertainty);
 
     // Read previous history
     int x=state, y=state, a;
@@ -280,11 +281,7 @@ pair<History, vector<int>> ucrl2(MDP &mdp, float delta, int steps, int episodes 
     int k=0;
     while (true) {
         k++;
-        if (k == episodes)
-            break;
-
         int start = t;
-        episode_history.push_back(start);
 
         // Initialize state-action counts, accumulated rewards and transition counts for the current episode
         for (int x=0; x<states; x++) {
@@ -294,23 +291,18 @@ pair<History, vector<int>> ucrl2(MDP &mdp, float delta, int steps, int episodes 
                 observed_rewards_before_episode[x][a] += observed_rewards_during_episode[x][a];
                 observed_rewards_during_episode[x][a] = 0.0;
 
-                estimated_rewards[x][a] = observed_rewards_before_episode[x][a] / max(1, visits_before_episode[x][a]);
                 for (int y=0; y<states; y++) {
                     observed_transitions_before_episode[x][a][y] += observed_transitions_during_episode[x][a][y];
                     observed_transitions_during_episode[x][a][y] = 0.0;
-                    estimated_transition_chances[x][a][y] = (double) observed_transitions_before_episode[x][a][y] / max(1, visits_before_episode[x][a]);
-                    if (visits_before_episode[x][a] == 0)
-                        estimated_transition_chances[x][a][y] = 1.0/states;
                 }
-
-                reward_uncertainty[x][a] = sqrt(3.5 * log(2*states*actions*start/delta) / max(1, visits_before_episode[x][a]));
-                transition_chance_uncertainty[x][a] = sqrt(14 * log(2*actions*start/delta) / max(1, visits_before_episode[x][a]));
             }
         }
+        extended_mdp.update(mdp, visits_before_episode, observed_rewards_before_episode, observed_transitions_before_episode, start, delta);
 
         // Compute optimal policy for optimist MDP (EVI)
-        Policy policy = extended_value_iteration(mdp, estimated_transition_chances, estimated_rewards, transition_chance_uncertainty, reward_uncertainty, 1000, 1.0/sqrt(start)); // TODO change eps
+        Policy policy = extended_value_iteration(mdp, extended_mdp, 1000, 1.0/sqrt(start)); // TODO change eps
         Agent agent = Agent(mdp, policy);
+        episode_history.push_back(pair(start, policy));
 
         // Iterate episode until a state-action pair has been visited in the current episode as many times as all episodes prior
         while (visits_during_episode[state][policy(state, 0)] < max(1, visits_before_episode[state][policy(state, 0)])) {
@@ -330,17 +322,68 @@ pair<History, vector<int>> ucrl2(MDP &mdp, float delta, int steps, int episodes 
             history.push_back(event);
 
             t++;
-            show_loading_bar("Running UCRL2...", t, steps);
+            if (steps>0)
+                show_loading_bar("Running UCRL2...   ", t, steps);
             state = y;
 
             if (t==steps)
                 break;
         }
+
+        if (t==steps || k==episodes)
+            break;
     }
 
     return pair(history, episode_history);
 }
 
-void seek_bad_episode(OfflineMDP &mdp, int n) {
+bool compare_policies(Policy &a, Policy &b, int states) {
+    for (int x=0; x<states; x++)
+        if (a(x, 0) != b(x, 0))
+            return false;
+    return true;
+}
+
+pair<History, EpisodeHistory> seek_bad_episode(OfflineMDP &mdp, History &history, EpisodeHistory &episode_history, float delta, int min) {
+    /*
+        Runs UCRL2 on MDP mdp with parameter delta
+        Finds a sub-optimal episode after n time steps
+    */
+
+    auto vi_output = value_iteration(mdp, 1e6, 1e-6);
+    Policy opt_policy = get<0>(vi_output);
+
+    int when_to_start = 0;
+    for (auto episode: episode_history) {
+        int start_time = episode.first;
+        Policy policy = episode.second;
+
+        // Find a policy that comes late enough...
+        if (start_time<min)
+            continue;
+        
+        // ... and is suboptimal
+        if (compare_policies(policy, opt_policy, mdp.getStates()))
+            continue;
+        
+        // When that is found, use that as start time
+        cout << "Found a bad policy after " << start_time << " steps:" << endl;
+        show_policy(policy);
+        when_to_start = start_time;
+        break;
+    }
+
+    if (when_to_start == 0) {
+        cout << "Found no bad episode" << endl;
+        return pair(History(0), EpisodeHistory(0));
+    }
+
+    MDP mdp_rl = (MDP) mdp;
+    History past(history.begin(), history.begin() + when_to_start);
+    
+    return ucrl2(mdp, delta, 0, 1, past);
+}
+
+void performance_test(Policy &policy) {
 
 }
