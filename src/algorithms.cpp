@@ -231,18 +231,19 @@ Policy extended_value_iteration(MDP &mdp, Matrix3D<double> &estimated_transition
     Policy policy = {{pol}};
 
     return policy;
-
 }
 
-History ucrl2(MDP &mdp, float delta, int steps, History context) {
+pair<History, vector<int>> ucrl2(MDP &mdp, float delta, int steps, int episodes = 0, History &context = nothing) {
     /*
         Plays UCRL2 on MDP mdp for a given duration, given the previous history provided by context
-        Returns observed history
+        Returns observed history and vector of episode start times
     */
     
     int t = context.size() + 1;
     double total_rewards;
-    History history(0);
+
+    History history;
+    vector<int> episode_history;
 
     int states = mdp.getStates();
     int actions = mdp.getMaxAction();
@@ -279,7 +280,11 @@ History ucrl2(MDP &mdp, float delta, int steps, History context) {
     int k=0;
     while (true) {
         k++;
+        if (k == episodes)
+            break;
+
         int start = t;
+        episode_history.push_back(start);
 
         // Initialize state-action counts, accumulated rewards and transition counts for the current episode
         for (int x=0; x<states; x++) {
@@ -324,12 +329,18 @@ History ucrl2(MDP &mdp, float delta, int steps, History context) {
             Event event(x, a, y, rewards);
             history.push_back(event);
 
-            if (t==steps)
-                return history;
-            
             t++;
             show_loading_bar("Running UCRL2...", t, steps);
             state = y;
+
+            if (t==steps)
+                break;
         }
     }
+
+    return pair(history, episode_history);
+}
+
+void seek_bad_episode(OfflineMDP &mdp, int n) {
+
 }
