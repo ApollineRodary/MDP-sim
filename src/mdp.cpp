@@ -90,6 +90,10 @@ float OfflineMDP::getTransitionChance(int x, int action, int y) {
     return transitions[x][action][y];
 }
 
+Matrix<float> &OfflineMDP::getRewardMatrix() {
+    return rewards;
+}
+
 Matrix3D<float> &OfflineMDP::getTransitionKernel() {
     /* Get transition kernel, i.e. p(y|x,a) for all x, a, y */
     return transitions;
@@ -139,6 +143,27 @@ void OfflineMDP::show() {
         cout << endl;
     }
     cout << endl;
+}
+
+void ExtendedMDP::update(MDP &mdp, Matrix<int> &visits, Matrix<float> &observed_rewards, Matrix3D<int> &observed_transitions, int t, double delta) {
+    int n = mdp.getStates();
+    for (int x=0; x<n; x++) {
+        for (int a: mdp.getAvailableActions(x)) {
+            estimated_rewards[x][a] = observed_rewards[x][a] / max(1, visits[x][a]);
+            for (int y=0; y<n; y++) {
+                estimated_transition_chances[x][a][y] = (double) observed_transitions[x][a][y] / max(1, visits[x][a]);
+                if (visits[x][a] == 0) 
+                    estimated_transition_chances[x][a][y] = 1.0/n;
+            }
+
+            reward_uncertainty[x][a] = sqrt(3.5 * log(2*n*mdp.getMaxAction()*t/delta) / max(1, visits[x][a]));
+            transition_chance_uncertainty[x][a] = sqrt(14 * log(2*mdp.getMaxAction()*t/delta) / max(1, visits[x][a]));
+        }
+    }
+}
+
+double ExtendedMDP::getOptimistReward(int x, int a) {
+    return estimated_rewards[x][a] + reward_uncertainty[x][a];
 }
 
 int Policy::operator()(int state, int t) {

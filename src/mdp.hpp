@@ -58,8 +58,26 @@ class OfflineMDP: public MDP {
     OfflineMDP(Matrix<int> &actions, Matrix3D<float> &transitions, Matrix<float> &rewards) : OfflineMDP(actions, transitions, rewards, 1.0f) {}
     float getRewards(int x, int action);
     float getTransitionChance(int x, int action, int y);
+    Matrix<float> &getRewardMatrix();
     Matrix3D<float> &getTransitionKernel();
     void show();
+};
+
+class ExtendedMDP {
+    public:
+    Matrix<double> &estimated_rewards;
+    Matrix<double> &reward_uncertainty;
+    Matrix3D<double> &estimated_transition_chances;
+    Matrix<double> &transition_chance_uncertainty;
+
+    ExtendedMDP(Matrix<double> &estimated_rewards, Matrix<double> &reward_uncertainty, Matrix3D<double> &estimated_transition_chances, Matrix<double> &transition_chance_uncertainty) :
+        estimated_rewards(estimated_rewards),
+        reward_uncertainty(reward_uncertainty),
+        estimated_transition_chances(estimated_transition_chances),
+        transition_chance_uncertainty(transition_chance_uncertainty) {}
+
+    void update(MDP &mdp, Matrix<int> &visits, Matrix<float> &observed_rewards, Matrix3D<int> &observed_transitions, int t, double delta);
+    double getOptimistReward(int x, int a);
 };
 
 struct Policy {
