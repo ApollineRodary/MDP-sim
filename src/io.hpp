@@ -2,4 +2,4 @@
 
 using namespace std;
 
-void show_loading_bar(string text, int a, int max);
+void show_loading_bar(const char text[20], int a, int max);

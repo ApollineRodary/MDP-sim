@@ -5,16 +5,22 @@
 
 using namespace std;
 
-void show_loading_bar(string text, int a, int max) {
+void show_loading_bar(const char text[20], int a, int max) {
     if (a*LENGTH % max > 0)
         return;
 
-    cout << text << " [";
-    for (int i=0; i<LENGTH; i++)
-        cout << " ";
-    cout << "]\r" << text << " [";
-    for (int i=0; i < a*LENGTH/max; i++)
+    int n = a*LENGTH/max;
+
+    cout << "\r                    [";
+    for (int i=0; i<n; i++)
         cout << "=";
-    cout << "\r";
+    for (int i=n; i<LENGTH; i++)
+        cout << " ";
+    cout << "]\r";
+
+    cout << text;
     cout.flush();
+
+    if (a==max)
+        cout << endl;
 }
