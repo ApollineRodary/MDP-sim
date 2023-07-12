@@ -8,7 +8,7 @@
 
 #define N 8
 #define SIM_STEPS 1e7
-#define SIM_STEPS_UCRL 1e6
+#define SIM_STEPS_UCRL 5e6
 
 using namespace std;
 namespace plt = matplotlibcpp;
@@ -80,6 +80,7 @@ int main() {
     }
 
     cout << "Waiting for matplotlib..." << endl;
+    plt::figure();
     plt::plot(regrets);
     plt::plot(gap_regrets);
     plt::save("ucrl2_regret.pdf");
@@ -87,10 +88,39 @@ int main() {
     cout << endl;
 
     // Look for a bad episode
-    cout << "--- Observing gain of a suboptimal episode" << endl;
-    auto bad_episode_ucrl_output = seek_bad_episode(mdp, history, episode_history, 1e-5, 1e5); 
-    History bad_episode_history = bad_episode_ucrl_output.first;
-    cout << "Episode lasted " << bad_episode_history.size() << " steps" << endl;
+    cout << "--- Observing gain of an episode with suboptimal history" << endl;
+    int k = find_bad_episode(history, episode_history, policy, 1e5);
+    int bad_episode_start = episode_history[k].first;
+    int bad_episode_duration = episode_history[k+1].first - bad_episode_start;
+    cout << "Episode starts at step " << bad_episode_start << " and lasted " << bad_episode_duration << " steps" << endl;
+    Policy bad_policy = episode_history[k].second;
+    
+    History past(history.begin(), history.begin() + bad_episode_start);
+    vector<pair<vector<double>, vector<double>>> performance_test_outputs;
+    for (int i=0; i<25; i++) {
+        show_loading_bar("Performance test... ", i+1, 25);
+        auto bad_episode_playback = ucrl2(mdp, 1e-5, 0, 1, past);
+        auto performance_test_output = performance_test(mdp, bad_policy, past, get<0>(bad_episode_playback), bad_episode_start, 1000, 1e-5);
+        performance_test_outputs.push_back(performance_test_output);
+    }
+
+    vector<double> g;
+    vector<double> g_opt;
+    for (int i=0; i<1000; i++) {
+        double gi = 0.0;
+        double gi_opt = 0.0;
+        for (auto a: performance_test_outputs) {
+            gi += a.first[i];
+            gi_opt += a.second[i];
+        }
+        g.push_back(gi/25);
+        g_opt.push_back(gi_opt/25);
+    }
+
+    plt::figure();
+    plt::plot(g_opt);
+    plt::plot(g);
+    plt::save("performance_test.pdf");
 
     return 0;
 }
